@@ -1,0 +1,64 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSFogOfWar
+
+RWTexture2D<float> Result;
+
+int precision;
+float dissipationFactor;
+
+RWBuffer<int> ratio;
+
+struct Clearer
+{
+    float3 position;
+    float radius;
+    float visibleRadius;
+    int isVisible;
+    int teamIndex;
+};
+
+struct TeamData
+{
+    float ratio;
+};
+
+RWStructuredBuffer<Clearer> clearers;
+int clearersNb;
+
+int currentTeam;
+
+float4 origin;
+float pixelSizeX;
+float pixelSizeZ;
+
+[numthreads(32,32,1)]
+void CSFogOfWar (uint3 id : SV_DispatchThreadID)
+{
+    float alpha = Result[id.xy].x > 0.4f ? 0.5f : 0.0f;
+    
+    const float3 pixelPos =  float3(id.x * pixelSizeX, 0, id.y * pixelSizeZ);
+    
+    for (int i = 0; i < clearersNb; i++)
+    {
+        const float len = distance(clearers[i].position - origin, pixelPos);
+        
+         if (currentTeam == clearers[i].teamIndex && len < clearers[i].radius)
+         {
+             alpha = 1.0f;
+             break;
+         }
+    }
+
+    for (int i = 0; i < clearersNb; i++)
+    {
+        const float len = distance(clearers[i].position - origin, pixelPos);
+
+        if (currentTeam == clearers[i].teamIndex || clearers[i].isVisible || ((alpha > 0.5f) && (len < clearers[i].visibleRadius)))
+            clearers[i].isVisible = 1;
+    }
+        
+    Result[id.xy] = alpha;
+
+    if (alpha > 0.5f)
+        InterlockedAdd(ratio[0], 1);
+}

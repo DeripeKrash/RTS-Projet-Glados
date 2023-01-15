@@ -1,0 +1,85 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSInfluenceMap
+#pragma kernel CSMap
+
+RWTexture2D<float4> renderTexture;
+
+struct Tile
+{
+    int teamIndex;
+    float influencePower;
+    float3 position;
+};
+
+struct Influencer
+{
+    int teamIndex;
+    float3 position;
+    float radius;
+};
+
+RWStructuredBuffer<Tile> tiles;
+int nbTileX;
+int nbTileY;
+
+StructuredBuffer<Influencer> influencers;
+int influencerNumber;
+
+float4 colors[16];
+
+void ProcessInfluenceMap(uint3 id)
+{
+    int index = id.x * nbTileY + id.y;
+    
+    if (tiles[index].teamIndex >= 0)
+    {
+        if (influencerNumber > 0)
+        {
+            tiles[index].influencePower = 0;
+            
+            for (int i = 0; i < influencerNumber; i++)
+            {                
+                float influence = 1.0f - clamp(distance(influencers[i].position, tiles[index].position) / influencers[i].radius, 0.0f, 1.0f);
+
+                if (tiles[index].influencePower < influence)
+                {
+                    tiles[index].influencePower = influence;
+                    tiles[index].teamIndex = influencers[i].teamIndex;
+                }
+            }
+        }
+    }
+}
+
+void ProcessRenderTexture(uint3 id)
+{
+    int index = id.x * nbTileY + id.y;
+    
+    if (tiles[index].teamIndex >= 0)
+    {
+        renderTexture[id.xy] = lerp(float4(0,0, 0, 1), colors[tiles[index].teamIndex], tiles[index].influencePower);
+        //renderTexture[id.xy][3] = tiles[index].influencePower;
+    }
+    else
+        renderTexture[id.xy] = float4(1,1,1,1);
+}
+
+[numthreads(32, 32, 1)]
+void CSInfluenceMap (uint3 id : SV_DispatchThreadID)
+{
+    ProcessInfluenceMap(id);
+    ProcessRenderTexture(id);
+}
+
+[numthreads(32,32,1)]
+void CSMap (uint3 id : SV_DispatchThreadID)
+{
+    int index = id.x * nbTileY + id.y;
+    
+    if (tiles[index].teamIndex < 0)
+        renderTexture[id.xy] = float4(1, 1, 1, 1);
+    else
+    {
+        renderTexture[id.xy] = float4(0,0, 0, 1);
+    }
+}
