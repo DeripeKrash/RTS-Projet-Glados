@@ -74,5 +74,5 @@ And finaly the "FogOfWar" folder contains the necessary scripts used to create t
     <img src="Screenshots/InfluenceMap.png" width=49% height=49% /> 
 </div>
 
-# Possible improvemets 
+# Possible improvements 
  - The AI is not tuned and thus is kinda dumb
